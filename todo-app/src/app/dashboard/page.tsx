@@ -8,6 +8,7 @@ type Task = {
   id: string
   title: string
   is_complete: boolean
+  created_at?: string
 }
 
 export default function DashboardPage() {
@@ -17,6 +18,10 @@ export default function DashboardPage() {
   const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState<string | null>(null)
+  const [calendarDate, setCalendarDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
+  const [activeDate, setActiveDate] = useState<string | null>(null)
 
   const showNotice = (message: string) => {
     setNotice(message)
@@ -46,12 +51,22 @@ export default function DashboardPage() {
   }, [router])
 
   // 📥 Fetch tasks
-  const fetchTasks = async (userId: string) => {
-    const { data, error } = await supabase
+  const fetchTasks = async (userId: string, dateFilter?: string | null) => {
+    let query = supabase
       .from('tasks')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+
+    if (dateFilter) {
+      const dayStart = new Date(`${dateFilter}T00:00:00`)
+      const dayEnd = new Date(`${dateFilter}T23:59:59.999`)
+      query = query
+        .gte('created_at', dayStart.toISOString())
+        .lte('created_at', dayEnd.toISOString())
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error(error)
@@ -75,7 +90,7 @@ export default function DashboardPage() {
       console.error(error)
     } else {
       setNewTask('')
-      fetchTasks(user.id)
+      fetchTasks(user.id, activeDate)
       showNotice('Task added')
     }
   }
@@ -83,7 +98,7 @@ export default function DashboardPage() {
   // ❌ Delete task
   const deleteTask = async (id: string) => {
     await supabase.from('tasks').delete().eq('id', id)
-    fetchTasks(user.id)
+    fetchTasks(user.id, activeDate)
     showNotice('Task deleted')
   }
 
@@ -94,8 +109,22 @@ export default function DashboardPage() {
       .update({ is_complete: !task.is_complete })
       .eq('id', task.id)
 
-    fetchTasks(user.id)
+    fetchTasks(user.id, activeDate)
     showNotice(task.is_complete ? 'Marked as active' : 'Marked as complete')
+  }
+
+  const applyDateFilter = async () => {
+    if (!user) return
+    setActiveDate(calendarDate)
+    await fetchTasks(user.id, calendarDate)
+    showNotice(`Showing tasks for ${calendarDate}`)
+  }
+
+  const clearDateFilter = async () => {
+    if (!user) return
+    setActiveDate(null)
+    await fetchTasks(user.id)
+    showNotice('Showing all dates')
   }
 
   // 🚪 Logout
@@ -132,6 +161,35 @@ export default function DashboardPage() {
               Logout
             </button>
           </div>
+        </div>
+
+        <div className="glass-panel p-4 sm:p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Calendar filter</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="date"
+              value={calendarDate}
+              onChange={(e) => setCalendarDate(e.target.value)}
+              className="soft-input sm:max-w-52"
+            />
+            <button
+              onClick={applyDateFilter}
+              className="btn btn-secondary sm:min-w-28"
+            >
+              Set Date
+            </button>
+            <button
+              onClick={clearDateFilter}
+              className="btn sm:min-w-28 border border-slate-300 bg-white/80 text-slate-700"
+            >
+              Clear
+            </button>
+          </div>
+          {activeDate && (
+            <p className="mt-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+              Active date: {activeDate}
+            </p>
+          )}
         </div>
 
         <div className="glass-panel p-4 sm:p-5">
