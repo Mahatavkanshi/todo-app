@@ -64,6 +64,24 @@ h4 {
   box-shadow: var(--shadow);
 }
 
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 0.8rem;
+  }
+
+  .glass-panel {
+    border-radius: 1rem;
+  }
+
+  .soft-input {
+    padding: 0.78rem 0.88rem;
+  }
+
+  .btn {
+    padding: 0.72rem 0.9rem;
+  }
+}
+
 .glass-panel-strong {
   background: var(--panel-strong);
 }

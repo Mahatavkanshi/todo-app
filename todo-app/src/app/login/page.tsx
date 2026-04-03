@@ -78,7 +78,7 @@ export default function LoginPage() {
 
   return (
     <div className="app-shell flex items-center justify-center">
-      <div className="glass-panel glass-panel-strong fade-up w-full max-w-4xl overflow-hidden md:grid md:grid-cols-[1.1fr_1fr]">
+      <div className="glass-panel glass-panel-strong fade-up w-full max-w-4xl overflow-hidden md:grid md:grid-cols-[1.08fr_1fr]">
         <div className="hidden bg-gradient-to-br from-teal-700 via-cyan-700 to-sky-700 p-8 text-teal-50 md:block">
           <p className="text-xs uppercase tracking-[0.24em] text-teal-100/80">Todo Workspace</p>
           <h1 className="mt-3 text-4xl leading-tight">Plan less. Ship more.</h1>
@@ -91,9 +91,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="p-6 sm:p-8">
+        <div className="p-5 sm:p-8">
           <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Welcome</p>
-          <h2 className="mt-2 text-3xl">Login / Sign Up</h2>
+          <h2 className="mt-2 text-3xl leading-tight">Login / Sign Up</h2>
           <p className="mt-2 text-sm text-slate-600">Use your email to access your personal task dashboard.</p>
 
           {error && (

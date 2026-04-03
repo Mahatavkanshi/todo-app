@@ -141,6 +141,11 @@ export default function DashboardPage() {
             <input
               value={newTask}
               onChange={(e) => setNewTask(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  addTask()
+                }
+              }}
               placeholder="Enter new task..."
               className="soft-input flex-1"
             />
@@ -172,7 +177,14 @@ export default function DashboardPage() {
                   task.is_complete ? 'line-through text-slate-400' : 'text-slate-800'
                 }`}
               >
-                {task.title}
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      task.is_complete ? 'bg-emerald-500' : 'bg-slate-300'
+                    }`}
+                  />
+                  {task.title}
+                </span>
               </button>
 
               <button
