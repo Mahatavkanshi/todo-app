@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
@@ -12,20 +12,39 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    const recoverLocalSession = async () => {
+      try {
+        const { error } = await supabase.auth.getSession()
+        if (error && /fetch/i.test(error.message)) {
+          await supabase.auth.signOut({ scope: 'local' })
+        }
+      } catch {
+        await supabase.auth.signOut({ scope: 'local' })
+      }
+    }
+
+    recoverLocalSession()
+  }, [])
+
   // SIGN UP FUNCTION
   const handleSignUp = async () => {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
-    } else {
-      alert('Check your email for confirmation!')
+      if (error) {
+        setError(error.message)
+      } else {
+        alert('Check your email for confirmation!')
+      }
+    } catch {
+      setError('Unable to reach Supabase. Check internet/VPN/firewall and try again.')
     }
 
     setLoading(false)
@@ -36,61 +55,84 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
-    } else {
-      router.push('/dashboard')
+      if (error) {
+        setError(error.message)
+      } else {
+        router.push('/dashboard')
+      }
+    } catch {
+      setError('Unable to reach Supabase. Check internet/VPN/firewall and try again.')
     }
 
     setLoading(false)
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-md">
-        <h1 className="mb-6 text-2xl font-bold text-center">
-          Login / Sign Up
-        </h1>
+    <div className="app-shell flex items-center justify-center">
+      <div className="glass-panel glass-panel-strong fade-up w-full max-w-4xl overflow-hidden md:grid md:grid-cols-[1.1fr_1fr]">
+        <div className="hidden bg-gradient-to-br from-teal-700 via-cyan-700 to-sky-700 p-8 text-teal-50 md:block">
+          <p className="text-xs uppercase tracking-[0.24em] text-teal-100/80">Todo Workspace</p>
+          <h1 className="mt-3 text-4xl leading-tight">Plan less. Ship more.</h1>
+          <p className="mt-4 max-w-sm text-sm text-teal-100/90">
+            Keep your daily tasks in one place with secure sign-in and a clear flow from capture to completion.
+          </p>
+          <div className="mt-8 rounded-xl border border-teal-100/30 bg-teal-950/25 p-4 text-sm">
+            <p className="font-semibold">Quick routine</p>
+            <p className="mt-1 text-teal-100/85">Sign in, add your top 3 tasks, and clear the queue before lunch.</p>
+          </div>
+        </div>
 
-        {error && (
-          <p className="mb-4 text-red-500 text-sm">{error}</p>
-        )}
+        <div className="p-6 sm:p-8">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Welcome</p>
+          <h2 className="mt-2 text-3xl">Login / Sign Up</h2>
+          <p className="mt-2 text-sm text-slate-600">Use your email to access your personal task dashboard.</p>
 
-        <input
-  type="email"
-  placeholder="Enter your email"
-  className="mb-3 w-full rounded border border-gray-300 bg-white p-3 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-/>
+          {error && (
+            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          )}
 
-<input
-  type="password"
-  placeholder="Enter your password"
-  className="mb-4 w-full rounded border border-gray-300 bg-white p-3 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-  value={password}
-  onChange={(e) => setPassword(e.target.value)}
-/>
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="mb-3 w-full rounded bg-blue-600 p-2 text-white hover:bg-blue-700"
-        >
-          {loading ? 'Loading...' : 'Login'}
-        </button>
+          <div className="mt-5 space-y-3">
+            <input
+              type="email"
+              placeholder="Enter your email"
+              className="soft-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
 
-        <button
-          onClick={handleSignUp}
-          disabled={loading}
-          className="w-full rounded bg-gray-800 p-2 text-white hover:bg-gray-900"
-        >
-          Sign Up
-        </button>
+            <input
+              type="password"
+              placeholder="Enter your password"
+              className="soft-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className="btn btn-primary"
+            >
+              {loading ? 'Loading...' : 'Login'}
+            </button>
+
+            <button
+              onClick={handleSignUp}
+              disabled={loading}
+              className="btn btn-secondary"
+            >
+              Sign Up
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

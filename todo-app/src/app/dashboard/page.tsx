@@ -20,16 +20,20 @@ export default function DashboardPage() {
   // 🔐 Check user + fetch tasks
   useEffect(() => {
     const init = async () => {
-      const { data, error } = await supabase.auth.getUser()
+      try {
+        const { data, error } = await supabase.auth.getUser()
 
-      if (error || !data.user) {
+        if (error || !data.user) {
+          router.push('/login')
+          return
+        }
+
+        setUser(data.user)
+        await fetchTasks(data.user.id)
+        setLoading(false)
+      } catch {
         router.push('/login')
-        return
       }
-
-      setUser(data.user)
-      await fetchTasks(data.user.id)
-      setLoading(false)
     }
 
     init()
@@ -91,61 +95,85 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
-  if (loading) return <p className="p-6">Loading...</p>
+  if (loading) {
+    return (
+      <div className="app-shell flex items-center justify-center">
+        <div className="glass-panel px-6 py-4 text-sm text-slate-700">Loading your workspace...</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="mb-6 flex justify-between">
-        <h1 className="text-2xl font-bold">Your Tasks</h1>
-
-        <button
-          onClick={handleLogout}
-          className="rounded bg-red-500 px-4 py-2 text-white"
-        >
-          Logout
-        </button>
-      </div>
-
-      {/* ➕ Add Task */}
-      <div className="mb-6 flex gap-2">
-        <input
-          value={newTask}
-          onChange={(e) => setNewTask(e.target.value)}
-          placeholder="Enter new task..."
-          className="flex-1 rounded border p-2 text-black"
-        />
-        <button
-          onClick={addTask}
-          className="rounded bg-blue-600 px-4 py-2 text-white"
-        >
-          Add
-        </button>
-      </div>
-
-      {/* 📋 Task List */}
-      <div className="space-y-3">
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-center justify-between rounded bg-white p-4 shadow"
-          >
-            <div
-              onClick={() => toggleTask(task)}
-              className={`cursor-pointer ${
-                task.is_complete ? 'line-through text-gray-400' : ''
-              }`}
-            >
-              {task.title}
+    <div className="app-shell">
+      <div className="mx-auto max-w-4xl space-y-5 fade-up">
+        <div className="glass-panel glass-panel-strong p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Dashboard</p>
+              <h1 className="mt-1 text-3xl">Your Tasks</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Signed in as <span className="font-medium text-slate-800">{user?.email}</span>
+              </p>
             </div>
 
             <button
-              onClick={() => deleteTask(task.id)}
-              className="text-red-500"
+              onClick={handleLogout}
+              className="btn btn-danger w-full sm:w-auto"
             >
-              Delete
+              Logout
             </button>
           </div>
-        ))}
+        </div>
+
+        <div className="glass-panel p-4 sm:p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Add a new task</p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              placeholder="Enter new task..."
+              className="soft-input flex-1"
+            />
+            <button
+              onClick={addTask}
+              className="btn btn-primary sm:min-w-28"
+            >
+              Add Task
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {tasks.length === 0 && (
+            <div className="glass-panel p-6 text-center text-sm text-slate-600">
+              Your list is clear. Add your first task to get started.
+            </div>
+          )}
+
+          {tasks.map((task) => (
+            <div
+              key={task.id}
+              className="task-item flex items-center justify-between gap-4"
+            >
+              <button
+                onClick={() => toggleTask(task)}
+                className={`text-left text-sm sm:text-base ${{
+                  true: 'line-through text-slate-400',
+                  false: 'text-slate-800',
+                }[String(task.is_complete) as 'true' | 'false']}`}
+              >
+                {task.title}
+              </button>
+
+              <button
+                onClick={() => deleteTask(task.id)}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
