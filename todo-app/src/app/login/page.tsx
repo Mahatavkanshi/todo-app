@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     const recoverLocalSession = async () => {
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const handleSignUp = async () => {
     setLoading(true)
     setError(null)
+    setNotice(null)
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -41,7 +43,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message)
       } else {
-        alert('Check your email for confirmation!')
+        setNotice('Account created. Check your email for confirmation before logging in.')
       }
     } catch {
       setError('Unable to reach Supabase. Check internet/VPN/firewall and try again.')
@@ -54,6 +56,7 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true)
     setError(null)
+    setNotice(null)
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -97,6 +100,10 @@ export default function LoginPage() {
             <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
           )}
 
+          {notice && (
+            <p className="surface-note mt-3 stagger-pop">{notice}</p>
+          )}
+
           <div className="mt-5 space-y-3">
             <input
               type="email"
@@ -121,7 +128,7 @@ export default function LoginPage() {
               disabled={loading}
               className="btn btn-primary"
             >
-              {loading ? 'Loading...' : 'Login'}
+              {loading ? 'Signing in...' : 'Login'}
             </button>
 
             <button

@@ -16,6 +16,12 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(true)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const showNotice = (message: string) => {
+    setNotice(message)
+    setTimeout(() => setNotice(null), 1600)
+  }
 
   // 🔐 Check user + fetch tasks
   useEffect(() => {
@@ -70,6 +76,7 @@ export default function DashboardPage() {
     } else {
       setNewTask('')
       fetchTasks(user.id)
+      showNotice('Task added')
     }
   }
 
@@ -77,6 +84,7 @@ export default function DashboardPage() {
   const deleteTask = async (id: string) => {
     await supabase.from('tasks').delete().eq('id', id)
     fetchTasks(user.id)
+    showNotice('Task deleted')
   }
 
   // 🔄 Toggle complete
@@ -87,6 +95,7 @@ export default function DashboardPage() {
       .eq('id', task.id)
 
     fetchTasks(user.id)
+    showNotice(task.is_complete ? 'Marked as active' : 'Marked as complete')
   }
 
   // 🚪 Logout
@@ -127,6 +136,7 @@ export default function DashboardPage() {
 
         <div className="glass-panel p-4 sm:p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Add a new task</p>
+          {notice && <p className="surface-note mb-3 stagger-pop">{notice}</p>}
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
               value={newTask}
@@ -150,17 +160,17 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {tasks.map((task) => (
+          {tasks.map((task, index) => (
             <div
               key={task.id}
-              className="task-item flex items-center justify-between gap-4"
+              className="task-item stagger-in flex items-center justify-between gap-4"
+              style={{ animationDelay: `${Math.min(index * 55, 280)}ms` }}
             >
               <button
                 onClick={() => toggleTask(task)}
-                className={`text-left text-sm sm:text-base ${{
-                  true: 'line-through text-slate-400',
-                  false: 'text-slate-800',
-                }[String(task.is_complete) as 'true' | 'false']}`}
+                className={`task-text-btn text-left text-sm sm:text-base ${
+                  task.is_complete ? 'line-through text-slate-400' : 'text-slate-800'
+                }`}
               >
                 {task.title}
               </button>

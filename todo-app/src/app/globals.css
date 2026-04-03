@@ -1,3 +1,5 @@
+@import 'tailwindcss';
+
 :root {
   color-scheme: light;
   --bg-top: #fff3dd;
@@ -103,6 +105,10 @@ h4 {
   filter: brightness(1.03);
 }
 
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
 .btn-primary {
   background: linear-gradient(130deg, var(--brand), var(--brand-dark));
   color: #f8fffe;
@@ -131,6 +137,34 @@ h4 {
   box-shadow: 0 8px 24px rgba(30, 41, 59, 0.12);
 }
 
+.task-text-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.task-text-btn:hover {
+  color: var(--brand-dark);
+}
+
+.surface-note {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(15, 118, 110, 0.22);
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f5f5a;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.stagger-in {
+  animation: fadeUp 420ms ease both;
+}
+
+.stagger-pop {
+  animation: softPop 280ms ease both;
+}
+
 .fade-up {
   animation: fadeUp 450ms ease both;
 }
@@ -143,5 +177,16 @@ h4 {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes softPop {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
