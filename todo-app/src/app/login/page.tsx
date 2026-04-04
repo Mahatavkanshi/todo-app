@@ -79,7 +79,7 @@ export default function LoginPage() {
   return (
     <div className="app-shell flex items-center justify-center">
       <div className="glass-panel glass-panel-strong fade-up w-full max-w-4xl overflow-hidden md:grid md:grid-cols-[1.08fr_1fr]">
-        <div className="hidden bg-gradient-to-br from-teal-700 via-cyan-700 to-sky-700 p-8 text-teal-50 md:block">
+        <div className="hidden bg-linear-to-br from-teal-700 via-cyan-700 to-sky-700 p-8 text-teal-50 md:block">
           <p className="text-xs uppercase tracking-[0.24em] text-teal-100/80">Todo Workspace</p>
           <h1 className="mt-3 text-4xl leading-tight">Plan less. Ship more.</h1>
           <p className="mt-4 max-w-sm text-sm text-teal-100/90">
