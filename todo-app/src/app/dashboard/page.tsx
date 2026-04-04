@@ -37,12 +37,6 @@ const formatTaskDate = (dateStr: string) => {
   })
 }
 
-const showPopup = (message: string) => {
-  if (typeof window !== 'undefined') {
-    window.alert(message)
-  }
-}
-
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -55,10 +49,19 @@ export default function DashboardPage() {
   const [isHistoryView, setIsHistoryView] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
 
   const showNotice = (message: string) => {
     setNotice(message)
     setTimeout(() => setNotice(null), 1600)
+  }
+
+  const showPopup = (message: string) => {
+    setPopupMessage(message)
+  }
+
+  const closePopup = () => {
+    setPopupMessage(null)
   }
 
   // 🔐 Check user + fetch tasks
@@ -456,6 +459,33 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {popupMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-popup-title"
+            className="glass-panel glass-panel-strong w-full max-w-md p-5 sm:p-6"
+          >
+            <p
+              id="dashboard-popup-title"
+              className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500"
+            >
+              Action blocked
+            </p>
+            <p className="mt-2 text-sm text-slate-700">{popupMessage}</p>
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={closePopup}
+                className="btn btn-secondary sm:min-w-24"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
