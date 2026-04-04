@@ -9,10 +9,14 @@ type Task = {
   title: string
   is_complete: boolean
   category?: TaskCategory | null
+  priority?: TaskPriority | null
+  due_date?: string | null
   created_at?: string
 }
 
 type TaskCategory = 'personal' | 'groceries' | 'study' | 'travelling' | 'other'
+type TaskPriority = 'low' | 'medium' | 'high'
+type CompletionFilter = 'all' | 'completed' | 'pending'
 
 const CATEGORY_OPTIONS: Array<{ value: TaskCategory; label: string; icon: string }> = [
   { value: 'personal', label: 'Personal', icon: '🙂' },
@@ -20,6 +24,12 @@ const CATEGORY_OPTIONS: Array<{ value: TaskCategory; label: string; icon: string
   { value: 'study', label: 'Study', icon: '📘' },
   { value: 'travelling', label: 'Travelling', icon: '✈️' },
   { value: 'other', label: 'Other', icon: '🗂️' },
+]
+
+const PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string; icon: string }> = [
+  { value: 'high', label: 'High', icon: '🔴' },
+  { value: 'medium', label: 'Medium', icon: '🟡' },
+  { value: 'low', label: 'Low', icon: '🟢' },
 ]
 
 const getTodayDateString = () => {
@@ -52,11 +62,32 @@ const getCategoryMeta = (category: Task['category']) =>
   CATEGORY_OPTIONS.find((item) => item.value === category) ??
   CATEGORY_OPTIONS.find((item) => item.value === 'other')!
 
-const isMissingCategoryColumnError = (error: unknown) => {
+const getPriorityMeta = (priority: Task['priority']) =>
+  PRIORITY_OPTIONS.find((item) => item.value === priority) ??
+  PRIORITY_OPTIONS.find((item) => item.value === 'medium')!
+
+const getDueDateOnly = (dueDate: Task['due_date']) => (dueDate ? dueDate.split('T')[0] : '')
+
+const formatDueDate = (dueDate: Task['due_date']) => {
+  const value = getDueDateOnly(dueDate)
+  if (!value) return 'No due date'
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const isTaskOverdue = (task: Task) => {
+  const due = getDueDateOnly(task.due_date)
+  return !!due && due < getTodayDateString() && !task.is_complete
+}
+
+const isMissingTaskColumnError = (error: unknown) => {
   const message = typeof error === 'object' && error !== null && 'message' in error
     ? String((error as { message?: string }).message)
     : ''
-  return /column/i.test(message) && /category/i.test(message)
+  return /column/i.test(message) && /(category|priority|due_date)/i.test(message)
 }
 
 export default function DashboardPage() {
@@ -72,8 +103,33 @@ export default function DashboardPage() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [editingCategory, setEditingCategory] = useState<TaskCategory>('other')
+  const [editingPriority, setEditingPriority] = useState<TaskPriority>('medium')
+  const [editingDueDate, setEditingDueDate] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<TaskCategory>('personal')
+  const [selectedPriority, setSelectedPriority] = useState<TaskPriority>('medium')
+  const [newDueDate, setNewDueDate] = useState('')
+  const [completionFilter, setCompletionFilter] = useState<CompletionFilter>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [popupMessage, setPopupMessage] = useState<string | null>(null)
+
+  const visibleTasks = tasks
+    .filter((task) => {
+      if (completionFilter === 'completed') return task.is_complete
+      if (completionFilter === 'pending') return !task.is_complete
+      return true
+    })
+    .filter((task) => task.title.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    .sort((a, b) => {
+      const dueA = getDueDateOnly(a.due_date)
+      const dueB = getDueDateOnly(b.due_date)
+      const dueTimeA = dueA ? new Date(`${dueA}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
+      const dueTimeB = dueB ? new Date(`${dueB}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
+      if (dueTimeA !== dueTimeB) return dueTimeA - dueTimeB
+
+      const createdA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const createdB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return createdB - createdA
+    })
 
   const showNotice = (message: string) => {
     setNotice(message)
@@ -167,11 +223,13 @@ export default function DashboardPage() {
         title: newTask,
         user_id: user.id,
         category: selectedCategory,
+        priority: selectedPriority,
+        due_date: newDueDate ? `${newDueDate}T23:59:59.999Z` : null,
         created_at: `${targetDate}T12:00:00.000Z`,
       },
     ])
 
-    if (error && isMissingCategoryColumnError(error)) {
+    if (error && isMissingTaskColumnError(error)) {
       const retry = await supabase.from('tasks').insert([
         {
           title: newTask,
@@ -181,7 +239,7 @@ export default function DashboardPage() {
       ])
       error = retry.error
       if (!retry.error) {
-        showNotice('Task added. Add category column in DB to save category.')
+        showNotice('Task added. Add category/priority/due_date columns in DB to save full metadata.')
       }
     }
 
@@ -189,6 +247,8 @@ export default function DashboardPage() {
       console.error(error)
     } else {
       setNewTask('')
+      setNewDueDate('')
+      setSelectedPriority('medium')
       fetchTasks(user.id, activeDate)
       showNotice('Task added')
     }
@@ -232,12 +292,16 @@ export default function DashboardPage() {
     setEditingTaskId(task.id)
     setEditingTitle(task.title)
     setEditingCategory(task.category ?? 'other')
+    setEditingPriority(task.priority ?? 'medium')
+    setEditingDueDate(getDueDateOnly(task.due_date))
   }
 
   const cancelEditTask = () => {
     setEditingTaskId(null)
     setEditingTitle('')
     setEditingCategory('other')
+    setEditingPriority('medium')
+    setEditingDueDate('')
   }
 
   const updateTask = async (taskId: string) => {
@@ -256,17 +320,22 @@ export default function DashboardPage() {
 
     let { error } = await supabase
       .from('tasks')
-      .update({ title: editingTitle.trim(), category: editingCategory })
+      .update({
+        title: editingTitle.trim(),
+        category: editingCategory,
+        priority: editingPriority,
+        due_date: editingDueDate ? `${editingDueDate}T23:59:59.999Z` : null,
+      })
       .eq('id', taskId)
 
-    if (error && isMissingCategoryColumnError(error)) {
+    if (error && isMissingTaskColumnError(error)) {
       const retry = await supabase
         .from('tasks')
         .update({ title: editingTitle.trim() })
         .eq('id', taskId)
       error = retry.error
       if (!retry.error) {
-        showNotice('Task updated. Add category column in DB to save category.')
+        showNotice('Task updated. Add category/priority/due_date columns in DB to save full metadata.')
       }
     }
 
@@ -280,6 +349,8 @@ export default function DashboardPage() {
     setEditingTaskId(null)
     setEditingTitle('')
     setEditingCategory('other')
+    setEditingPriority('medium')
+    setEditingDueDate('')
     showNotice('Task updated')
   }
 
@@ -401,7 +472,7 @@ export default function DashboardPage() {
         <div className="glass-panel p-4 sm:p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Add a new task</p>
           {notice && <p className="surface-note mb-3 stagger-pop">{notice}</p>}
-          <div className="mb-3">
+          <div className="mb-3 grid gap-3 md:grid-cols-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Category</p>
             <div className="flex flex-wrap gap-2">
               {CATEGORY_OPTIONS.map((option) => (
@@ -420,6 +491,37 @@ export default function DashboardPage() {
                   </span>
                 </button>
               ))}
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Priority</p>
+              <div className="flex flex-wrap gap-2">
+                {PRIORITY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSelectedPriority(option.value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      selectedPriority === option.value
+                        ? 'border-slate-700 bg-slate-700 text-white'
+                        : 'border-slate-300 bg-white/80 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{option.icon}</span>
+                      <span>{option.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Due date</p>
+              <input
+                type="date"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                className="soft-input"
+                disabled={isPastDate(calendarDate) || (!!activeDate && isPastDate(activeDate))}
+              />
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -448,17 +550,46 @@ export default function DashboardPage() {
           )}
         </div>
 
+        <div className="glass-panel p-4 sm:p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Task controls</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {(['all', 'completed', 'pending'] as CompletionFilter[]).map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setCompletionFilter(item)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-widest transition ${
+                    completionFilter === item
+                      ? 'border-slate-700 bg-slate-700 text-white'
+                      : 'border-slate-300 bg-white/80 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks..."
+              className="soft-input sm:max-w-xs"
+            />
+          </div>
+        </div>
+
         <div className="space-y-3">
-          {tasks.length === 0 && (
+          {visibleTasks.length === 0 && (
             <div className="glass-panel p-6 text-center text-sm text-slate-600">
-              Your list is clear. Add your first task to get started.
+              No tasks match this filter.
             </div>
           )}
 
-          {tasks.map((task, index) => (
+          {visibleTasks.map((task, index) => (
             <div
               key={task.id}
-              className="task-item stagger-in flex items-center justify-between gap-4"
+              className={`task-item stagger-in flex items-center justify-between gap-4 ${
+                isTaskOverdue(task) ? 'border-red-200 bg-red-50/70' : ''
+              }`}
               style={{ animationDelay: `${Math.min(index * 55, 280)}ms` }}
             >
               <div className="flex-1">
@@ -480,6 +611,23 @@ export default function DashboardPage() {
                         </option>
                       ))}
                     </select>
+                    <select
+                      value={editingPriority}
+                      onChange={(e) => setEditingPriority(e.target.value as TaskPriority)}
+                      className="soft-input sm:max-w-36"
+                    >
+                      {PRIORITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      value={editingDueDate}
+                      onChange={(e) => setEditingDueDate(e.target.value)}
+                      className="soft-input sm:max-w-44"
+                    />
                     <div className="flex gap-2">
                       <button
                         onClick={() => updateTask(task.id)}
@@ -496,13 +644,19 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => toggleTask(task)}
-                    className={`task-text-btn text-left text-sm sm:text-base ${
-                      task.is_complete ? 'line-through text-slate-400' : 'text-slate-800'
-                    }`}
-                  >
-                    <span className="inline-flex items-center gap-2">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={task.is_complete}
+                      onChange={() => toggleTask(task)}
+                      disabled={isTaskReadOnly(task)}
+                      className="mt-1 h-4 w-4 cursor-pointer rounded border-slate-300 text-teal-700"
+                    />
+                    <span
+                      className={`inline-flex items-center gap-2 text-sm sm:text-base ${
+                        task.is_complete ? 'text-slate-500' : 'text-slate-800'
+                      }`}
+                    >
                       <span
                         className={`h-2.5 w-2.5 rounded-full ${
                           task.is_complete ? 'bg-emerald-500' : 'bg-slate-300'
@@ -510,10 +664,26 @@ export default function DashboardPage() {
                       />
                       {task.title}
                     </span>
-                  </button>
+                  </div>
                 )}
                 <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                   <span>Date: {formatTaskDate(getTaskDate(task))}</span>
+                  <span className={`rounded-full border px-2 py-0.5 font-medium ${
+                    isTaskOverdue(task)
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-slate-200 bg-white text-slate-700'
+                  }`}>
+                    Due: {formatDueDate(task.due_date)}
+                  </span>
+                  <span className={`rounded-full border px-2 py-0.5 font-medium ${
+                    task.priority === 'high'
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : task.priority === 'medium'
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  }`}>
+                    {getPriorityMeta(task.priority).icon} {getPriorityMeta(task.priority).label}
+                  </span>
                   <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-medium text-sky-700">
                     {getCategoryMeta(task.category).icon} {getCategoryMeta(task.category).label}
                   </span>
