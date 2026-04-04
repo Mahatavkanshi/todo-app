@@ -8,8 +8,19 @@ type Task = {
   id: string
   title: string
   is_complete: boolean
+  category?: TaskCategory | null
   created_at?: string
 }
+
+type TaskCategory = 'personal' | 'groceries' | 'study' | 'travelling' | 'other'
+
+const CATEGORY_OPTIONS: Array<{ value: TaskCategory; label: string; icon: string }> = [
+  { value: 'personal', label: 'Personal', icon: '🙂' },
+  { value: 'groceries', label: 'Groceries', icon: '🛒' },
+  { value: 'study', label: 'Study', icon: '📘' },
+  { value: 'travelling', label: 'Travelling', icon: '✈️' },
+  { value: 'other', label: 'Other', icon: '🗂️' },
+]
 
 const getTodayDateString = () => {
   const now = new Date()
@@ -37,6 +48,17 @@ const formatTaskDate = (dateStr: string) => {
   })
 }
 
+const getCategoryMeta = (category: Task['category']) =>
+  CATEGORY_OPTIONS.find((item) => item.value === category) ??
+  CATEGORY_OPTIONS.find((item) => item.value === 'other')!
+
+const isMissingCategoryColumnError = (error: unknown) => {
+  const message = typeof error === 'object' && error !== null && 'message' in error
+    ? String((error as { message?: string }).message)
+    : ''
+  return /column/i.test(message) && /category/i.test(message)
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -49,6 +71,8 @@ export default function DashboardPage() {
   const [isHistoryView, setIsHistoryView] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [editingCategory, setEditingCategory] = useState<TaskCategory>('other')
+  const [selectedCategory, setSelectedCategory] = useState<TaskCategory>('personal')
   const [popupMessage, setPopupMessage] = useState<string | null>(null)
 
   const showNotice = (message: string) => {
@@ -138,13 +162,28 @@ export default function DashboardPage() {
       return
     }
 
-    const { error } = await supabase.from('tasks').insert([
+    let { error } = await supabase.from('tasks').insert([
       {
         title: newTask,
         user_id: user.id,
+        category: selectedCategory,
         created_at: `${targetDate}T12:00:00.000Z`,
       },
     ])
+
+    if (error && isMissingCategoryColumnError(error)) {
+      const retry = await supabase.from('tasks').insert([
+        {
+          title: newTask,
+          user_id: user.id,
+          created_at: `${targetDate}T12:00:00.000Z`,
+        },
+      ])
+      error = retry.error
+      if (!retry.error) {
+        showNotice('Task added. Add category column in DB to save category.')
+      }
+    }
 
     if (error) {
       console.error(error)
@@ -192,11 +231,13 @@ export default function DashboardPage() {
 
     setEditingTaskId(task.id)
     setEditingTitle(task.title)
+    setEditingCategory(task.category ?? 'other')
   }
 
   const cancelEditTask = () => {
     setEditingTaskId(null)
     setEditingTitle('')
+    setEditingCategory('other')
   }
 
   const updateTask = async (taskId: string) => {
@@ -213,10 +254,21 @@ export default function DashboardPage() {
       return
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('tasks')
-      .update({ title: editingTitle.trim() })
+      .update({ title: editingTitle.trim(), category: editingCategory })
       .eq('id', taskId)
+
+    if (error && isMissingCategoryColumnError(error)) {
+      const retry = await supabase
+        .from('tasks')
+        .update({ title: editingTitle.trim() })
+        .eq('id', taskId)
+      error = retry.error
+      if (!retry.error) {
+        showNotice('Task updated. Add category column in DB to save category.')
+      }
+    }
 
     if (error) {
       console.error(error)
@@ -227,6 +279,7 @@ export default function DashboardPage() {
     await fetchTasks(user.id, activeDate)
     setEditingTaskId(null)
     setEditingTitle('')
+    setEditingCategory('other')
     showNotice('Task updated')
   }
 
@@ -348,6 +401,27 @@ export default function DashboardPage() {
         <div className="glass-panel p-4 sm:p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Add a new task</p>
           {notice && <p className="surface-note mb-3 stagger-pop">{notice}</p>}
+          <div className="mb-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Category</p>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setSelectedCategory(option.value)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    selectedCategory === option.value
+                      ? 'border-slate-700 bg-slate-700 text-white'
+                      : 'border-slate-300 bg-white/80 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>{option.icon}</span>
+                    <span>{option.label}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
               value={newTask}
@@ -395,6 +469,17 @@ export default function DashboardPage() {
                       onChange={(e) => setEditingTitle(e.target.value)}
                       className="soft-input"
                     />
+                    <select
+                      value={editingCategory}
+                      onChange={(e) => setEditingCategory(e.target.value as TaskCategory)}
+                      className="soft-input sm:max-w-44"
+                    >
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                     <div className="flex gap-2">
                       <button
                         onClick={() => updateTask(task.id)}
@@ -429,6 +514,9 @@ export default function DashboardPage() {
                 )}
                 <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                   <span>Date: {formatTaskDate(getTaskDate(task))}</span>
+                  <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-medium text-sky-700">
+                    {getCategoryMeta(task.category).icon} {getCategoryMeta(task.category).label}
+                  </span>
                   <span
                     className={`rounded-full px-2 py-0.5 font-medium ${
                       isTaskReadOnly(task)
