@@ -68,15 +68,7 @@ const getPriorityMeta = (priority: Task['priority']) =>
 
 const getDueDateOnly = (dueDate: Task['due_date']) => (dueDate ? dueDate.split('T')[0] : '')
 
-const formatDueDate = (dueDate: Task['due_date']) => {
-  const value = getDueDateOnly(dueDate)
-  if (!value) return 'No due date'
-  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
+const getTaskDueDateOnly = (task: Task) => getDueDateOnly(task.due_date) || getTaskDate(task)
 
 const isTaskOverdue = (task: Task) => {
   const due = getDueDateOnly(task.due_date)
@@ -673,7 +665,7 @@ export default function DashboardPage() {
                       ? 'border-red-200 bg-red-50 text-red-700'
                       : 'border-slate-200 bg-white text-slate-700'
                   }`}>
-                    Due: {formatDueDate(task.due_date)}
+                    Due: {formatTaskDate(getTaskDueDateOnly(task))}
                   </span>
                   <span className={`rounded-full border px-2 py-0.5 font-medium ${
                     task.priority === 'high'
@@ -686,15 +678,6 @@ export default function DashboardPage() {
                   </span>
                   <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-medium text-sky-700">
                     {getCategoryMeta(task.category).icon} {getCategoryMeta(task.category).label}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-medium ${
-                      isTaskReadOnly(task)
-                        ? 'border border-amber-200 bg-amber-50 text-amber-700'
-                        : 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    {isTaskReadOnly(task) ? 'Read-only' : 'Editable'}
                   </span>
                 </div>
               </div>
