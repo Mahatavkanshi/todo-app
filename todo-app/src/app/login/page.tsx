@@ -4,6 +4,31 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
+const isRedirectUrlError = (message: string) =>
+  /(redirect|url|uri|site url|not allowed|allow list)/i.test(message)
+
+const normalizeAuthErrorMessage = (value: unknown, fallback: string) => {
+  if (typeof value === 'string') {
+    const msg = value.trim()
+    if (msg && msg !== '{}' && msg !== '[]' && msg !== '[object Object]') {
+      return msg
+    }
+    return fallback
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = (value as { message?: unknown }).message
+    if (typeof candidate === 'string') {
+      const msg = candidate.trim()
+      if (msg && msg !== '{}' && msg !== '[]' && msg !== '[object Object]') {
+        return msg
+      }
+    }
+  }
+
+  return fallback
+}
+
 export default function LoginPage() {
   const router = useRouter()
 
@@ -39,7 +64,7 @@ export default function LoginPage() {
       const emailRedirectTo =
         typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined
 
-      const { data, error } = await supabase.auth.signUp({
+      let signUpResponse = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -47,8 +72,17 @@ export default function LoginPage() {
         },
       })
 
+      if (signUpResponse.error && isRedirectUrlError(signUpResponse.error.message)) {
+        signUpResponse = await supabase.auth.signUp({
+          email,
+          password,
+        })
+      }
+
+      const { data, error } = signUpResponse
+
       if (error) {
-        setError(error.message)
+        setError(normalizeAuthErrorMessage(error.message, 'Sign up failed. Please try again in a moment.'))
       } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
         setPendingConfirmationEmail(email)
         setNotice('This email is already registered. If it is unconfirmed, use "Resend confirmation email" below.')
@@ -81,7 +115,7 @@ export default function LoginPage() {
       const emailRedirectTo =
         typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined
 
-      const { error } = await supabase.auth.resend({
+      let resendResponse = await supabase.auth.resend({
         type: 'signup',
         email: targetEmail,
         options: {
@@ -89,8 +123,17 @@ export default function LoginPage() {
         },
       })
 
+      if (resendResponse.error && isRedirectUrlError(resendResponse.error.message)) {
+        resendResponse = await supabase.auth.resend({
+          type: 'signup',
+          email: targetEmail,
+        })
+      }
+
+      const { error } = resendResponse
+
       if (error) {
-        setError(error.message)
+        setError(normalizeAuthErrorMessage(error.message, 'Could not resend confirmation email. Please try again.'))
       } else {
         setPendingConfirmationEmail(targetEmail)
         setNotice('Confirmation email sent again. Check inbox/spam for the latest message.')
@@ -115,7 +158,7 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setError(error.message)
+        setError(normalizeAuthErrorMessage(error.message, 'Login failed. Please check your email/password.'))
       } else {
         router.push('/dashboard')
       }
