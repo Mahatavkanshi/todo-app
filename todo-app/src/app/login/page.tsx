@@ -29,6 +29,45 @@ const normalizeAuthErrorMessage = (value: unknown, fallback: string) => {
   return fallback
 }
 
+const getAuthErrorMessage = (error: unknown, fallback: string) => {
+  const message = normalizeAuthErrorMessage(
+    error && typeof error === 'object' ? (error as { message?: unknown }).message : error,
+    ''
+  )
+
+  if (message) return message
+
+  if (error && typeof error === 'object') {
+    const maybeStatus = (error as { status?: unknown }).status
+    const maybeCode = (error as { code?: unknown }).code
+
+    const status = typeof maybeStatus === 'number' ? maybeStatus : null
+    const code = typeof maybeCode === 'string' ? maybeCode : null
+
+    if (status === 422) {
+      return 'Invalid signup details. Use a valid email and a password with at least 6 characters.'
+    }
+
+    if (status === 429) {
+      return 'Too many attempts. Please wait a minute and try again.'
+    }
+
+    if (status === 400 && code) {
+      return `Sign up failed (${code}). Check Auth URL configuration and try again.`
+    }
+
+    if (status) {
+      return `${fallback} (status ${status}${code ? `, code ${code}` : ''})`
+    }
+
+    if (code) {
+      return `${fallback} (code ${code})`
+    }
+  }
+
+  return fallback
+}
+
 export default function LoginPage() {
   const router = useRouter()
 
@@ -82,7 +121,8 @@ export default function LoginPage() {
       const { data, error } = signUpResponse
 
       if (error) {
-        setError(normalizeAuthErrorMessage(error.message, 'Sign up failed. Please try again in a moment.'))
+        console.error('Supabase signUp error:', error)
+        setError(getAuthErrorMessage(error, 'Sign up failed. Please try again in a moment.'))
       } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
         setPendingConfirmationEmail(email)
         setNotice('This email is already registered. If it is unconfirmed, use "Resend confirmation email" below.')
@@ -133,7 +173,8 @@ export default function LoginPage() {
       const { error } = resendResponse
 
       if (error) {
-        setError(normalizeAuthErrorMessage(error.message, 'Could not resend confirmation email. Please try again.'))
+        console.error('Supabase resend error:', error)
+        setError(getAuthErrorMessage(error, 'Could not resend confirmation email. Please try again.'))
       } else {
         setPendingConfirmationEmail(targetEmail)
         setNotice('Confirmation email sent again. Check inbox/spam for the latest message.')
@@ -158,7 +199,8 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setError(normalizeAuthErrorMessage(error.message, 'Login failed. Please check your email/password.'))
+        console.error('Supabase login error:', error)
+        setError(getAuthErrorMessage(error, 'Login failed. Please check your email/password.'))
       } else {
         router.push('/dashboard')
       }

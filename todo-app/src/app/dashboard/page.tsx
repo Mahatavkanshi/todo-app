@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 type Task = {
   id: string
@@ -84,7 +85,7 @@ const isMissingTaskColumnError = (error: unknown) => {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(true)
@@ -136,30 +137,8 @@ export default function DashboardPage() {
     setPopupMessage(null)
   }
 
-  // 🔐 Check user + fetch tasks
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { data, error } = await supabase.auth.getUser()
-
-        if (error || !data.user) {
-          router.push('/login')
-          return
-        }
-
-        setUser(data.user)
-        await fetchTasks(data.user.id)
-        setLoading(false)
-      } catch {
-        router.push('/login')
-      }
-    }
-
-    init()
-  }, [router])
-
   // 📥 Fetch tasks
-  const fetchTasks = async (
+  const fetchTasks = useCallback(async (
     userId: string,
     dateFilter?: string | null,
     includePast = false
@@ -188,7 +167,29 @@ export default function DashboardPage() {
     } else {
       setTasks(data as Task[])
     }
-  }
+  }, [])
+
+  // 🔐 Check user + fetch tasks
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser()
+
+        if (error || !data.user) {
+          router.push('/login')
+          return
+        }
+
+        setUser(data.user)
+        await fetchTasks(data.user.id)
+        setLoading(false)
+      } catch {
+        router.push('/login')
+      }
+    }
+
+    init()
+  }, [fetchTasks, router])
 
   // ➕ Add task
   const addTask = async () => {
