@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null)
 
   useEffect(() => {
     const recoverLocalSession = async () => {
@@ -35,18 +36,67 @@ export default function LoginPage() {
     setNotice(null)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const emailRedirectTo =
+        typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo,
+        },
+      })
+
+      if (error) {
+        setError(error.message)
+      } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setPendingConfirmationEmail(email)
+        setNotice('This email is already registered. If it is unconfirmed, use "Resend confirmation email" below.')
+      } else if (data.session) {
+        setNotice('Account created and signed in. Email confirmation appears disabled in your Supabase Auth settings.')
+      } else {
+        setPendingConfirmationEmail(email)
+        setNotice('Account created. Check your inbox/spam for the confirmation email before logging in.')
+      }
+    } catch {
+      setError('Unable to reach Supabase. Check internet/VPN/firewall and try again.')
+    }
+
+    setLoading(false)
+  }
+
+  const handleResendConfirmation = async () => {
+    const targetEmail = pendingConfirmationEmail || email
+
+    if (!targetEmail) {
+      setError('Enter your email first, then click Sign Up or Resend confirmation email.')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setNotice(null)
+
+    try {
+      const emailRedirectTo =
+        typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: targetEmail,
+        options: {
+          emailRedirectTo,
+        },
       })
 
       if (error) {
         setError(error.message)
       } else {
-        setNotice('Account created. Check your email for confirmation before logging in.')
+        setPendingConfirmationEmail(targetEmail)
+        setNotice('Confirmation email sent again. Check inbox/spam for the latest message.')
       }
     } catch {
-      setError('Unable to reach Supabase. Check internet/VPN/firewall and try again.')
+      setError('Unable to reach Supabase while resending. Check internet/VPN/firewall and try again.')
     }
 
     setLoading(false)
@@ -139,6 +189,14 @@ export default function LoginPage() {
               Sign Up
             </button>
           </div>
+
+          <button
+            onClick={handleResendConfirmation}
+            disabled={loading}
+            className="mt-3 text-sm text-sky-700 underline decoration-sky-400 underline-offset-4 hover:text-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Resend confirmation email
+          </button>
         </div>
       </div>
     </div>
